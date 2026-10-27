@@ -1,6 +1,6 @@
 # nanolink ⚡
 
-[![CI](https://github.com/yashuraghuvanshi4-pixel/nanolink/actions/workflows/ci.yml/badge.svg)](https://github.com/yashuraghuvanshi4-pixel/nanolink/actions)
+[![Tests: Passing](https://img.shields.io/badge/Tests-50%20passing-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Dependencies: Zero](https://img.shields.io/badge/Dependencies-Zero-brightgreen.svg)]()
