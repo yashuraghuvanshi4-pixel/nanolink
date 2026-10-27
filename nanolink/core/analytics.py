@@ -94,6 +94,22 @@ def extract_referrer_domain(referer: Optional[str]) -> Optional[str]:
         return None
 
 
+def resolve_country(headers: Optional[Dict[str, str]] = None, ip: str = "") -> str:
+    """Determine visitor country from proxy headers (Cloudflare, CloudFront, Fastly)."""
+    if headers:
+        lowered = {str(k).lower(): str(v) for k, v in headers.items()}
+        for header_key in ("cf-ipcountry", "x-country-code", "cloudfront-viewer-country"):
+            val = lowered.get(header_key)
+            if val and val.strip() and val.upper() not in ("XX", "T1", "UNKNOWN"):
+                return val.strip().upper()
+
+    # Check for loopback / private IP
+    if ip in ("127.0.0.1", "::1", "localhost") or ip.startswith("192.168.") or ip.startswith("10."):
+        return "Local"
+
+    return "Unknown"
+
+
 class AnalyticsEngine:
     """Manages click recording, IP anonymization, and aggregated statistics."""
 
@@ -106,11 +122,13 @@ class AnalyticsEngine:
         ip: str,
         user_agent: Optional[str] = None,
         referer: Optional[str] = None,
+        country: Optional[str] = None,
     ) -> ClickEvent:
         """Record a redirect event and update link metrics."""
         browser, os_name, device = parse_user_agent(user_agent)
         referer_domain = extract_referrer_domain(referer)
         ip_hash = anonymize_ip(ip)
+        resolved_country = country or resolve_country(ip=ip)
 
         event = ClickEvent(
             link_code=link_code,
@@ -121,6 +139,7 @@ class AnalyticsEngine:
             device_type=device,
             referer=referer,
             referer_domain=referer_domain,
+            country=resolved_country,
         )
 
         self.db.record_click(event)
@@ -142,6 +161,7 @@ class AnalyticsEngine:
         browsers: CounterType[str] = Counter()
         os_counts: CounterType[str] = Counter()
         devices: CounterType[str] = Counter()
+        country_counts: CounterType[str] = Counter()
 
         for c in clicks:
             unique_ips.add(c.ip_hash)
@@ -160,6 +180,8 @@ class AnalyticsEngine:
             browsers[c.browser] += 1
             os_counts[c.os] += 1
             devices[c.device_type] += 1
+            if c.country:
+                country_counts[c.country] += 1
 
         top_referrers = referrers.most_common(10)
 
@@ -173,4 +195,5 @@ class AnalyticsEngine:
             browsers=dict(browsers.most_common(5)),
             os_breakdown=dict(os_counts.most_common(5)),
             devices=dict(devices.most_common(5)),
+            countries=dict(country_counts.most_common(10)),
         )

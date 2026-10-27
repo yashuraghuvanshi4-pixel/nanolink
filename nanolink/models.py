@@ -148,6 +148,7 @@ class LinkStats:
     browsers: Dict[str, int] = field(default_factory=dict)
     os_breakdown: Dict[str, int] = field(default_factory=dict)
     devices: Dict[str, int] = field(default_factory=dict)
+    countries: Dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -160,4 +161,5 @@ class LinkStats:
             "browsers": self.browsers,
             "os_breakdown": self.os_breakdown,
             "devices": self.devices,
+            "countries": self.countries,
         }

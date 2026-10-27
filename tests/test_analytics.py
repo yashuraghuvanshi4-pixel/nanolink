@@ -91,6 +91,13 @@ class TestAnalytics(unittest.TestCase):
         self.assertIn(("github.com", 2), stats.top_referrers)
         self.assertIn(("Direct / None", 1), stats.top_referrers)
 
+    def test_resolve_country(self):
+        from nanolink.core.analytics import resolve_country
+        self.assertEqual(resolve_country({"CF-IPCountry": "US"}), "US")
+        self.assertEqual(resolve_country({"CloudFront-Viewer-Country": "IN"}), "IN")
+        self.assertEqual(resolve_country(ip="127.0.0.1"), "Local")
+        self.assertEqual(resolve_country(ip="8.8.8.8"), "Unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

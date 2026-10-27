@@ -134,11 +134,14 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
 
         # Record analytics
         try:
+            from nanolink.core.analytics import resolve_country
+            country_code = resolve_country(dict(self.headers), client_ip)
             self.analytics.record_click(
                 link_code=code,
                 ip=client_ip,
                 user_agent=user_agent,
                 referer=referer,
+                country=country_code,
             )
         except Exception:
             # Analytics recording failure should not block user redirection
