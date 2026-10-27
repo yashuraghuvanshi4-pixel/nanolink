@@ -231,3 +231,36 @@ class Database:
         finally:
             if not self._is_memory:
                 conn.close()
+
+    def backup(self, dest_path: str | Path) -> None:
+        """Create a hot backup of the SQLite database to destination path."""
+        target = Path(dest_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        conn = self.get_connection()
+        try:
+            dest_conn = sqlite3.connect(str(target))
+            try:
+                conn.backup(dest_conn)
+            finally:
+                dest_conn.close()
+        finally:
+            if not self._is_memory:
+                conn.close()
+
+    def vacuum(self) -> None:
+        """Compact the database file and reclaim unused storage space."""
+        conn = self.get_connection()
+        try:
+            conn.execute("VACUUM;")
+        finally:
+            if not self._is_memory:
+                conn.close()
+
+    def get_db_size(self) -> int:
+        """Return the size of the database file on disk in bytes."""
+        if self._is_memory or not isinstance(self.db_path, Path):
+            return 0
+        try:
+            return self.db_path.stat().st_size
+        except OSError:
+            return 0

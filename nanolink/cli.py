@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from nanolink import __version__
@@ -150,6 +151,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve = subparsers.add_parser("serve", help="Launch redirect engine & REST API server")
     p_serve.add_argument("-p", "--port", type=int, default=settings.port, help=f"Server port (default: {settings.port})")
     p_serve.add_argument("-H", "--host", type=str, default=settings.host, help=f"Host interface (default: {settings.host})")
+
+    # 11. backup
+    p_backup = subparsers.add_parser("backup", help="Create a hot backup of the SQLite database")
+    p_backup.add_argument("target", type=str, help="Destination file path for backup")
+
+    # 12. vacuum
+    p_vacuum = subparsers.add_parser("vacuum", help="Compact and optimize SQLite storage")
 
     return parser
 
@@ -395,24 +403,6 @@ def cmd_export(args: argparse.Namespace, db: Database) -> int:
     return 0
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    """Main CLI entrypoint."""
-    parser = build_parser()
-    args = parser.parse_args(argv)
-
-    db = Database(args.db)
-    service = LinkService(db)
-
-    if args.command == "shorten":
-        return cmd_shorten(args, service)
-    elif args.command == "resolve":
-        return cmd_resolve(args, service)
-    elif args.command == "stats":
-        return cmd_stats(args, db)
-    elif args.command == "list":
-        return cmd_list(args, service)
-    elif args.command == "qr":
-        return cmd_qr(args, service)
 def cmd_search(args: argparse.Namespace, service: LinkService) -> int:
     links = service.search_links(args.query, limit=args.limit)
     if args.json:
@@ -431,6 +421,28 @@ def cmd_search(args: argparse.Namespace, service: LinkService) -> int:
         dest = l.target_url if len(l.target_url) <= 35 else l.target_url[:32] + "..."
         print(f"{bold(l.code):<10} {l.click_count:<8} {dim(tags_str):<18} {dest}")
     print()
+    return 0
+
+
+def cmd_backup(args: argparse.Namespace, db: Database) -> int:
+    try:
+        db.backup(args.target)
+        size = Path(args.target).stat().st_size
+        print(bold(green(f"✔ Backup successfully created: {args.target} ({size} bytes)")))
+        return 0
+    except Exception as err:
+        print(red(f"Backup failed: {err}"), file=sys.stderr)
+        return 1
+
+
+def cmd_vacuum(args: argparse.Namespace, db: Database) -> int:
+    before = db.get_db_size()
+    db.vacuum()
+    after = db.get_db_size()
+    saved = max(0, before - after)
+    print(bold(green("✔ Database vacuumed and optimized successfully.")))
+    if before > 0:
+        print(f"  Size before: {before} bytes | Size after: {after} bytes ({saved} bytes reclaimed)")
     return 0
 
 
@@ -460,6 +472,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_export(args, db)
     elif args.command == "search":
         return cmd_search(args, service)
+    elif args.command == "backup":
+        return cmd_backup(args, db)
+    elif args.command == "vacuum":
+        return cmd_vacuum(args, db)
     elif args.command == "serve":
         from nanolink.server.handler import run_server
         return run_server(host=args.host, port=args.port, db=db)
