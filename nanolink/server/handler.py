@@ -19,6 +19,7 @@ from nanolink.core.service import (
     LinkNotFoundError,
     LinkExpiredError,
 )
+from nanolink.server.ratelimit import RateLimiter
 from nanolink.storage.db import Database
 
 
@@ -26,6 +27,7 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
     """Handles HTTP redirection, analytics collection, and REST API endpoints."""
 
     server_version = f"nanolink/{__version__}"
+    rate_limiter = RateLimiter(max_requests=100, window_seconds=60)
 
     def __init__(self, *args, db: Optional[Database] = None, **kwargs) -> None:
         self.db = db or getattr(self, "default_db", Database())
@@ -152,6 +154,18 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
+        client_ip = self.headers.get("X-Forwarded-For", self.client_address[0])
+        allowed, retry_after = self.rate_limiter.is_allowed(client_ip)
+        if not allowed:
+            self.send_response(HTTPStatus.TOO_MANY_REQUESTS)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Retry-After", str(retry_after))
+            msg = json.dumps({"error": "Rate limit exceeded. Please try again later.", "retry_after": retry_after}).encode("utf-8")
+            self.send_header("Content-Length", str(len(msg)))
+            self.end_headers()
+            self.wfile.write(msg)
+            return
+
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
 
