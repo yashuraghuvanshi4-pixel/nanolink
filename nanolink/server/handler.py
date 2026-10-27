@@ -101,8 +101,8 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, {"links": [l.to_dict() for l in links]})
             return
 
-        # Dashboard web UI (handled in next commit, stub for now)
-        if path == "" or path == "/":
+        # Dashboard web UI
+        if path in ("", "/", "/dashboard"):
             self._handle_root_ui()
             return
 
@@ -202,16 +202,9 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Endpoint not found."})
 
     def _handle_root_ui(self) -> None:
-        """Render a placeholder root landing page or dashboard."""
-        html = f"""<!DOCTYPE html>
-<html>
-<head><title>nanolink ⚡</title></head>
-<body style="font-family:sans-serif;background:#0d1117;color:#c9d1d9;padding:2rem;">
-  <h1>⚡ nanolink URL Engine v{__version__}</h1>
-  <p>Status: Operational</p>
-  <p>REST API: <code>POST /api/shorten</code>, <code>GET /api/stats/&lt;code&gt;</code></p>
-</body></html>"""
-        data = html.encode("utf-8")
+        """Render embedded single-page web dashboard."""
+        from nanolink.server.dashboard import DASHBOARD_HTML
+        data = DASHBOARD_HTML.encode("utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))

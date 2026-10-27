@@ -77,6 +77,15 @@ class TestServer(unittest.TestCase):
             urllib.request.urlopen(req)
         self.assertEqual(ctx.exception.code, 400)
 
+    def test_dashboard_ui_endpoint(self):
+        url = f"http://127.0.0.1:{self.port}/dashboard"
+        with urllib.request.urlopen(url) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertIn("text/html", resp.headers.get("Content-Type"))
+            body = resp.read().decode("utf-8")
+            self.assertIn("nanolink", body)
+            self.assertIn("Shorten New URL", body)
+
 
 if __name__ == "__main__":
     unittest.main()
