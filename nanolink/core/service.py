@@ -21,6 +21,7 @@ RESERVED_CODES: Set[str] = {
 }
 
 
+from nanolink.core.cache import LRUCache
 from nanolink.core.security import is_safe_url
 
 
@@ -51,9 +52,16 @@ class LinkExpiredError(LinkServiceError):
 class LinkService:
     """Coordinates link shortening, resolution, expiry, and lifecycle management."""
 
-    def __init__(self, db: Optional[Database] = None, allow_localhost: bool = True) -> None:
+    def __init__(
+        self,
+        db: Optional[Database] = None,
+        allow_localhost: bool = True,
+        enable_cache: bool = True,
+        cache_size: int = 10000,
+    ) -> None:
         self.db = db or Database()
         self.allow_localhost = allow_localhost
+        self.cache: Optional[LRUCache] = LRUCache(maxsize=cache_size) if enable_cache else None
 
     def shorten(
         self,
@@ -133,18 +141,15 @@ class LinkService:
         raise LinkServiceError("Failed to generate a unique short code after 15 attempts.")
 
     def resolve(self, code: str) -> Link:
-        """Resolve a short code to its destination link.
+        """Resolve a short code to its destination link with LRU caching."""
+        if self.cache is not None:
+            cached = self.cache.get(code)
+            if cached is not None:
+                if cached.is_expired():
+                    self.cache.invalidate(code)
+                    raise LinkExpiredError(f"Short link '{code}' has expired.")
+                return cached
 
-        Args:
-            code: The short link identifier.
-
-        Returns:
-            The active Link object.
-
-        Raises:
-            LinkNotFoundError: If code is not found.
-            LinkExpiredError: If link has expired.
-        """
         link = self.db.get_link(code)
         if link is None:
             raise LinkNotFoundError(f"Short code '{code}' not found.")
@@ -152,10 +157,15 @@ class LinkService:
         if link.is_expired():
             raise LinkExpiredError(f"Short link '{code}' has expired.")
 
+        if self.cache is not None:
+            self.cache.set(code, link)
+
         return link
 
     def delete(self, code: str) -> bool:
-        """Delete a short link."""
+        """Delete a short link and invalidate cache."""
+        if self.cache is not None:
+            self.cache.invalidate(code)
         return self.db.delete_link(code)
 
     def list_links(self, limit: int = 50, offset: int = 0, tag: Optional[str] = None) -> List[Link]:
