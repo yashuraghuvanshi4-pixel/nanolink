@@ -9,6 +9,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 from nanolink import __version__
+from nanolink.config import Settings
 from nanolink.core.analytics import AnalyticsEngine
 from nanolink.core.qr import QRCode
 from nanolink.core.service import (
@@ -66,6 +67,7 @@ def render_bar(count: int, max_count: int, width: int = 24) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     """Construct argument parser for CLI commands."""
+    settings = Settings.from_env()
     parser = argparse.ArgumentParser(
         prog="nanolink",
         description="⚡ High-performance URL shortener & analytics engine",
@@ -73,8 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--db",
         type=str,
-        default=str(DEFAULT_DB_PATH),
-        help=f"Path to SQLite database file (default: {DEFAULT_DB_PATH})",
+        default=settings.db_path,
+        help=f"Path to SQLite database file (default: {settings.db_path})",
     )
     parser.add_argument(
         "--version", action="version", version=f"nanolink v{__version__}"
@@ -90,7 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_shorten.add_argument("--ttl", type=int, help="Time to live in seconds")
     p_shorten.add_argument("--max-clicks", type=int, help="Maximum allowed clicks")
     p_shorten.add_argument(
-        "--base-url", type=str, default="http://localhost:8000", help="Base redirect URL"
+        "--base-url", type=str, default=settings.base_url, help=f"Base redirect URL (default: {settings.base_url})"
     )
     p_shorten.add_argument("--qr", action="store_true", help="Print QR code in terminal")
     p_shorten.add_argument("--json", action="store_true", help="Output as JSON")
@@ -146,8 +148,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # 10. serve
     p_serve = subparsers.add_parser("serve", help="Launch redirect engine & REST API server")
-    p_serve.add_argument("-p", "--port", type=int, default=8000, help="Server port (8000)")
-    p_serve.add_argument("-H", "--host", type=str, default="127.0.0.1", help="Host interface")
+    p_serve.add_argument("-p", "--port", type=int, default=settings.port, help=f"Server port (default: {settings.port})")
+    p_serve.add_argument("-H", "--host", type=str, default=settings.host, help=f"Host interface (default: {settings.host})")
 
     return parser
 
