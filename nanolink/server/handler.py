@@ -86,6 +86,23 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(data)
             return
 
+        # OpenAPI spec
+        if path == "/openapi.json":
+            from nanolink.server.openapi import OPENAPI_SPEC
+            self._send_json(HTTPStatus.OK, OPENAPI_SPEC)
+            return
+
+        # Swagger API Documentation
+        if path == "/docs":
+            from nanolink.server.openapi import SWAGGER_UI_HTML
+            data = SWAGGER_UI_HTML.encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
         # API: Export clicks
         if path.startswith("/api/stats/") and path.endswith("/export"):
             code = path.split("/api/stats/", 1)[1][:-7]  # strip /export
