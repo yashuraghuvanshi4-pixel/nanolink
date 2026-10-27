@@ -138,7 +138,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_export.add_argument("--format", choices=["csv", "json"], default="csv", help="Export format")
     p_export.add_argument("-o", "--output", type=str, help="Save to output file path")
 
-    # 9. serve
+    # 9. search
+    p_search = subparsers.add_parser("search", help="Search links by query")
+    p_search.add_argument("query", type=str, help="Search string across code, URL, title, tags")
+    p_search.add_argument("-n", "--limit", type=int, default=20, help="Max results")
+    p_search.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # 10. serve
     p_serve = subparsers.add_parser("serve", help="Launch redirect engine & REST API server")
     p_serve.add_argument("-p", "--port", type=int, default=8000, help="Server port (8000)")
     p_serve.add_argument("-H", "--host", type=str, default="127.0.0.1", help="Host interface")
@@ -405,12 +411,53 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_list(args, service)
     elif args.command == "qr":
         return cmd_qr(args, service)
+def cmd_search(args: argparse.Namespace, service: LinkService) -> int:
+    links = service.search_links(args.query, limit=args.limit)
+    if args.json:
+        print(json.dumps([l.to_dict() for l in links], indent=2))
+        return 0
+
+    if not links:
+        print(dim(f"No links matched query '{args.query}'."))
+        return 0
+
+    print(bold(cyan(f"\n⚡ Search Results for '{args.query}' ({len(links)} matches):")))
+    print(f"{'CODE':<10} {'CLICKS':<8} {'TAGS':<18} {'DESTINATION'}")
+    print("-" * 75)
+    for l in links:
+        tags_str = ",".join(l.tags) if l.tags else "-"
+        dest = l.target_url if len(l.target_url) <= 35 else l.target_url[:32] + "..."
+        print(f"{bold(l.code):<10} {l.click_count:<8} {dim(tags_str):<18} {dest}")
+    print()
+    return 0
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    """Main CLI entrypoint."""
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    db = Database(args.db)
+    service = LinkService(db)
+
+    if args.command == "shorten":
+        return cmd_shorten(args, service)
+    elif args.command == "resolve":
+        return cmd_resolve(args, service)
+    elif args.command == "stats":
+        return cmd_stats(args, db)
+    elif args.command == "list":
+        return cmd_list(args, service)
+    elif args.command == "qr":
+        return cmd_qr(args, service)
     elif args.command == "delete":
         return cmd_delete(args, service)
     elif args.command == "bulk":
         return cmd_bulk(args, service)
     elif args.command == "export":
         return cmd_export(args, db)
+    elif args.command == "search":
+        return cmd_search(args, service)
     elif args.command == "serve":
         from nanolink.server.handler import run_server
         return run_server(host=args.host, port=args.port, db=db)

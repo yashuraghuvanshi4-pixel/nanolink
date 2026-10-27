@@ -213,3 +213,21 @@ class Database:
         finally:
             if not self._is_memory:
                 conn.close()
+
+    def search_links(self, query: str, limit: int = 50) -> List[Link]:
+        """Search links by code, target URL, title, or tags."""
+        conn = self.get_connection()
+        try:
+            pattern = f"%{query}%"
+            rows = conn.execute(
+                """
+                SELECT * FROM links
+                WHERE code LIKE ? OR target_url LIKE ? OR title LIKE ? OR tags LIKE ?
+                ORDER BY created_at DESC LIMIT ?
+                """,
+                (pattern, pattern, pattern, pattern, limit),
+            ).fetchall()
+            return [Link.from_row(r) for r in rows]
+        finally:
+            if not self._is_memory:
+                conn.close()

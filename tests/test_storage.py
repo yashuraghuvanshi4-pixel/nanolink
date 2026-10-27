@@ -95,6 +95,18 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(len(m_links), 1)
         self.assertEqual(m_links[0].code, "tagged1")
 
+    def test_search_links(self):
+        self.db.save_link(Link(code="search1", target_url="https://docs.python.org", title="Python Docs"))
+        self.db.save_link(Link(code="search2", target_url="https://rust-lang.org", title="Rust Language"))
+
+        matches = self.db.search_links("Python")
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0].code, "search1")
+
+        matches_code = self.db.search_links("search2")
+        self.assertEqual(len(matches_code), 1)
+        self.assertEqual(matches_code[0].code, "search2")
+
 
 if __name__ == "__main__":
     unittest.main()

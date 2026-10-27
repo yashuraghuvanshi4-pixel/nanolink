@@ -115,8 +115,17 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/links":
             limit = int(query.get("limit", ["20"])[0])
             offset = int(query.get("offset", ["0"])[0])
-            links = self.service.list_links(limit=limit, offset=offset)
+            tag = query.get("tag", [None])[0]
+            links = self.service.list_links(limit=limit, offset=offset, tag=tag)
             self._send_json(HTTPStatus.OK, {"links": [l.to_dict() for l in links]})
+            return
+
+        # API: Search links
+        if path == "/api/search":
+            q = query.get("q", [""])[0]
+            limit = int(query.get("limit", ["20"])[0])
+            links = self.service.search_links(q, limit=limit)
+            self._send_json(HTTPStatus.OK, {"results": [l.to_dict() for l in links], "total": len(links)})
             return
 
         # Dashboard web UI

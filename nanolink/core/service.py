@@ -197,3 +197,7 @@ class LinkService:
                     "error": str(err),
                 })
         return results
+
+    def search_links(self, query: str, limit: int = 50) -> List[Link]:
+        """Search links by keyword across code, destination, title, and tags."""
+        return self.db.search_links(query, limit=limit)
