@@ -20,6 +20,7 @@ from nanolink.core.service import (
     LinkExpiredError,
 )
 from nanolink.server.metrics import MetricsCollector
+from nanolink.server.middleware import CORSMiddleware, TimingMiddleware, MiddlewarePipeline
 from nanolink.server.ratelimit import RateLimiter
 from nanolink.storage.db import Database
 
@@ -30,6 +31,7 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
     server_version = f"nanolink/{__version__}"
     rate_limiter = RateLimiter(max_requests=100, window_seconds=60)
     metrics = MetricsCollector()
+    pipeline = MiddlewarePipeline([TimingMiddleware(), CORSMiddleware()])
 
     def __init__(self, *args, db: Optional[Database] = None, **kwargs) -> None:
         self.db = db or getattr(self, "default_db", Database())
@@ -45,10 +47,14 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
 
     def _send_json(self, status: int, payload: Dict[str, Any]) -> None:
         data = json.dumps(payload).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json; charset=utf-8",
+            "Content-Length": str(len(data)),
+        }
+        status, headers = self.pipeline.execute_post(self, status, headers)
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        for k, v in headers.items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(data)
 
