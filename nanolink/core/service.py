@@ -21,6 +21,9 @@ RESERVED_CODES: Set[str] = {
 }
 
 
+from nanolink.core.security import is_safe_url
+
+
 class LinkServiceError(Exception):
     """Base exception for LinkService errors."""
 
@@ -48,8 +51,9 @@ class LinkExpiredError(LinkServiceError):
 class LinkService:
     """Coordinates link shortening, resolution, expiry, and lifecycle management."""
 
-    def __init__(self, db: Optional[Database] = None) -> None:
+    def __init__(self, db: Optional[Database] = None, allow_localhost: bool = True) -> None:
         self.db = db or Database()
+        self.allow_localhost = allow_localhost
 
     def shorten(
         self,
@@ -64,7 +68,11 @@ class LinkService:
         # Normalize and validate URL
         target_url = url.strip()
         if not validate_url(target_url):
-            raise InvalidURLError(f"Invalid URL: '{url}'")
+            raise InvalidURLError(f"Invalid URL format: '{url}'")
+
+        is_safe, reason = is_safe_url(target_url, allow_localhost=self.allow_localhost)
+        if not is_safe:
+            raise InvalidURLError(f"Blocked URL ({reason}): '{url}'")
 
         expires_at: Optional[str] = None
         if ttl_seconds is not None and ttl_seconds > 0:
