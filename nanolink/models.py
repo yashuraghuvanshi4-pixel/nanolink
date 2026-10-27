@@ -49,6 +49,7 @@ class Link:
     max_clicks: Optional[int] = None
     click_count: int = 0
     is_active: bool = True
+    tags: List[str] = field(default_factory=list)
     id: Optional[int] = None
 
     def is_expired(self, current_time: Optional[datetime] = None) -> bool:
@@ -82,6 +83,8 @@ class Link:
     @classmethod
     def from_row(cls, row: Any) -> "Link":
         """Instantiate Link from a sqlite3.Row or dict-like object."""
+        raw_tags = row["tags"] if "tags" in row.keys() and row["tags"] else ""
+        tags_list = [t.strip() for t in raw_tags.split(",") if t.strip()] if raw_tags else []
         return cls(
             id=row["id"],
             code=row["code"],
@@ -92,6 +95,7 @@ class Link:
             max_clicks=row["max_clicks"] if "max_clicks" in row.keys() else None,
             click_count=row["click_count"] if "click_count" in row.keys() else 0,
             is_active=bool(row["is_active"]) if "is_active" in row.keys() else True,
+            tags=tags_list,
         )
 
 

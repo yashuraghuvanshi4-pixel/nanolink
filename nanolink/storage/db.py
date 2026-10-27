@@ -69,7 +69,8 @@ class Database:
                     expires_at TEXT,
                     max_clicks INTEGER,
                     click_count INTEGER DEFAULT 0,
-                    is_active INTEGER DEFAULT 1
+                    is_active INTEGER DEFAULT 1,
+                    tags TEXT DEFAULT ''
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_links_code ON links(code);
@@ -94,6 +95,11 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_clicks_ip ON clicks(ip_hash);
                 """
             )
+            # Ensure tags column exists for backward compatibility
+            try:
+                conn.execute("ALTER TABLE links ADD COLUMN tags TEXT DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass
             conn.commit()
         finally:
             if not self._is_memory:
@@ -103,10 +109,11 @@ class Database:
         """Insert a short link record."""
         conn = self.get_connection()
         try:
+            tags_str = ",".join(link.tags) if link.tags else ""
             cursor = conn.execute(
                 """
-                INSERT INTO links (code, target_url, title, created_at, expires_at, max_clicks, click_count, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO links (code, target_url, title, created_at, expires_at, max_clicks, click_count, is_active, tags)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     link.code,
@@ -117,6 +124,7 @@ class Database:
                     link.max_clicks,
                     link.click_count,
                     1 if link.is_active else 0,
+                    tags_str,
                 ),
             )
             conn.commit()
@@ -169,14 +177,20 @@ class Database:
             if not self._is_memory:
                 conn.close()
 
-    def list_links(self, limit: int = 50, offset: int = 0) -> List[Link]:
-        """List shortened links in reverse chronological order."""
+    def list_links(self, limit: int = 50, offset: int = 0, tag: Optional[str] = None) -> List[Link]:
+        """List shortened links in reverse chronological order with optional tag filtering."""
         conn = self.get_connection()
         try:
-            rows = conn.execute(
-                "SELECT * FROM links ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (limit, offset),
-            ).fetchall()
+            if tag:
+                rows = conn.execute(
+                    "SELECT * FROM links WHERE tags LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (f"%{tag}%", limit, offset),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM links ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                ).fetchall()
             return [Link.from_row(r) for r in rows]
         finally:
             if not self._is_memory:

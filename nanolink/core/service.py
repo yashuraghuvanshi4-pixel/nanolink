@@ -58,24 +58,9 @@ class LinkService:
         title: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         max_clicks: Optional[int] = None,
+        tags: Optional[List[str]] = None,
     ) -> Link:
-        """Create a shortened link with optional alias, TTL, and click cap.
-
-        Args:
-            url: The destination URL (http/https).
-            custom_alias: Optional user-chosen short code.
-            title: Optional title/description for the link.
-            ttl_seconds: Lifetime in seconds from now.
-            max_clicks: Maximum permitted clicks before expiring.
-
-        Returns:
-            The saved Link object.
-
-        Raises:
-            InvalidURLError: If the URL is invalid.
-            InvalidAliasError: If custom alias is invalid or reserved.
-            AliasAlreadyExistsError: If custom alias is already taken.
-        """
+        """Create a shortened link with optional alias, TTL, click cap, and tags."""
         # Normalize and validate URL
         target_url = url.strip()
         if not validate_url(target_url):
@@ -102,12 +87,15 @@ class LinkService:
         else:
             code = self._generate_unique_code(target_url)
 
+        cleaned_tags = [t.strip().lower() for t in (tags or []) if t.strip()]
+
         link = Link(
             code=code,
             target_url=target_url,
             title=title.strip() if title else None,
             expires_at=expires_at,
             max_clicks=max_clicks,
+            tags=cleaned_tags,
         )
         return self.db.save_link(link)
 
@@ -162,9 +150,9 @@ class LinkService:
         """Delete a short link."""
         return self.db.delete_link(code)
 
-    def list_links(self, limit: int = 50, offset: int = 0) -> List[Link]:
-        """List shortened links."""
-        return self.db.list_links(limit=limit, offset=offset)
+    def list_links(self, limit: int = 50, offset: int = 0, tag: Optional[str] = None) -> List[Link]:
+        """List shortened links with optional tag filter."""
+        return self.db.list_links(limit=limit, offset=offset, tag=tag)
 
     def bulk_shorten(self, items: List[dict]) -> List[dict]:
         """Shorten multiple URLs in batch.

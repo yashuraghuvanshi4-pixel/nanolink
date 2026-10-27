@@ -84,6 +84,17 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(metrics["total_links"], 2)
         self.assertEqual(metrics["total_clicks"], 2)
 
+    def test_tags_storage_and_filter(self):
+        self.db.save_link(Link(code="tagged1", target_url="https://site1.com", tags=["marketing", "blog"]))
+        self.db.save_link(Link(code="tagged2", target_url="https://site2.com", tags=["product"]))
+
+        fetched = self.db.get_link("tagged1")
+        self.assertEqual(fetched.tags, ["marketing", "blog"])
+
+        m_links = self.db.list_links(tag="marketing")
+        self.assertEqual(len(m_links), 1)
+        self.assertEqual(m_links[0].code, "tagged1")
+
 
 if __name__ == "__main__":
     unittest.main()
