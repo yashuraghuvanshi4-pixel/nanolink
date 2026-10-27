@@ -55,52 +55,12 @@ class Database:
         return conn
 
     def _init_db(self) -> None:
-        """Initialize database schema with indexed tables."""
+        """Initialize and migrate database schema to latest version."""
+        from nanolink.storage.migrations import MigrationRunner
         conn = self.get_connection()
         try:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS links (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    code TEXT NOT NULL UNIQUE,
-                    target_url TEXT NOT NULL,
-                    title TEXT,
-                    created_at TEXT NOT NULL,
-                    expires_at TEXT,
-                    max_clicks INTEGER,
-                    click_count INTEGER DEFAULT 0,
-                    is_active INTEGER DEFAULT 1,
-                    tags TEXT DEFAULT ''
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_links_code ON links(code);
-                CREATE INDEX IF NOT EXISTS idx_links_created ON links(created_at DESC);
-
-                CREATE TABLE IF NOT EXISTS clicks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    link_code TEXT NOT NULL,
-                    timestamp TEXT NOT NULL,
-                    ip_hash TEXT NOT NULL,
-                    user_agent TEXT,
-                    browser TEXT,
-                    os TEXT,
-                    device_type TEXT,
-                    referer TEXT,
-                    referer_domain TEXT,
-                    country TEXT,
-                    FOREIGN KEY (link_code) REFERENCES links(code) ON DELETE CASCADE
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_clicks_code_ts ON clicks(link_code, timestamp DESC);
-                CREATE INDEX IF NOT EXISTS idx_clicks_ip ON clicks(ip_hash);
-                """
-            )
-            # Ensure tags column exists for backward compatibility
-            try:
-                conn.execute("ALTER TABLE links ADD COLUMN tags TEXT DEFAULT ''")
-            except sqlite3.OperationalError:
-                pass
-            conn.commit()
+            runner = MigrationRunner(conn)
+            runner.apply_all()
         finally:
             if not self._is_memory:
                 conn.close()
