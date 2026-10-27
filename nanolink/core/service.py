@@ -165,3 +165,39 @@ class LinkService:
     def list_links(self, limit: int = 50, offset: int = 0) -> List[Link]:
         """List shortened links."""
         return self.db.list_links(limit=limit, offset=offset)
+
+    def bulk_shorten(self, items: List[dict]) -> List[dict]:
+        """Shorten multiple URLs in batch.
+
+        Args:
+            items: List of dictionaries with url, optional alias, title, ttl_seconds, max_clicks.
+
+        Returns:
+            List of result dictionaries with success status, code, and short_url or error message.
+        """
+        results = []
+        for item in items:
+            url = item.get("url")
+            alias = item.get("alias")
+            title = item.get("title")
+            ttl_seconds = item.get("ttl_seconds")
+            max_clicks = item.get("max_clicks")
+
+            try:
+                link = self.shorten(
+                    url=url,
+                    custom_alias=alias,
+                    title=title,
+                    ttl_seconds=ttl_seconds,
+                    max_clicks=max_clicks,
+                )
+                res = link.to_dict()
+                res["success"] = True
+                results.append(res)
+            except Exception as err:
+                results.append({
+                    "success": False,
+                    "url": url,
+                    "error": str(err),
+                })
+        return results

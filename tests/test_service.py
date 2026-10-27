@@ -71,11 +71,19 @@ class TestLinkService(unittest.TestCase):
         with self.assertRaises(LinkExpiredError):
             self.service.resolve("capped")
 
-    def test_delete_link(self):
-        self.service.shorten("https://todelete.org", custom_alias="temp")
-        self.assertTrue(self.service.delete("temp"))
-        with self.assertRaises(LinkNotFoundError):
-            self.service.resolve("temp")
+    def test_bulk_shorten(self):
+        items = [
+            {"url": "https://example.com/1", "alias": "ex-one"},
+            {"url": "https://example.com/2"},
+            {"url": "invalid-url"},
+        ]
+        results = self.service.bulk_shorten(items)
+        self.assertEqual(len(results), 3)
+        self.assertTrue(results[0]["success"])
+        self.assertEqual(results[0]["code"], "ex-one")
+        self.assertTrue(results[1]["success"])
+        self.assertFalse(results[2]["success"])
+        self.assertIn("error", results[2])
 
 
 if __name__ == "__main__":

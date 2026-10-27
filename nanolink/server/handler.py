@@ -199,6 +199,32 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.CREATED, response_data)
             return
 
+        if path == "/api/bulk-shorten":
+            content_length = int(self.headers.get("Content-Length", 0))
+            if content_length == 0:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Missing JSON request body."})
+                return
+
+            try:
+                body = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            except Exception:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Malformed JSON payload."})
+                return
+
+            items = body.get("items")
+            if not isinstance(items, list):
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Field 'items' must be a list of link objects."})
+                return
+
+            results = self.service.bulk_shorten(items)
+            host = self.headers.get("Host", "localhost:8000")
+            for r in results:
+                if r.get("success") and "code" in r:
+                    r["short_url"] = f"http://{host}/{r['code']}"
+
+            self._send_json(HTTPStatus.CREATED, {"results": results, "total": len(results)})
+            return
+
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Endpoint not found."})
 
     def _handle_root_ui(self) -> None:

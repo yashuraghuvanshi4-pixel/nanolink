@@ -86,6 +86,20 @@ class TestServer(unittest.TestCase):
             self.assertIn("nanolink", body)
             self.assertIn("Shorten New URL", body)
 
+    def test_bulk_shorten_api(self):
+        payload = json.dumps({"items": [{"url": "https://bulk1.com", "alias": "bulk-1"}]}).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/bulk-shorten",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            self.assertEqual(resp.status, 201)
+            data = json.loads(resp.read().decode())
+            self.assertEqual(data["total"], 1)
+            self.assertTrue(data["results"][0]["success"])
+
 
 if __name__ == "__main__":
     unittest.main()

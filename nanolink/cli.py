@@ -126,7 +126,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_delete.add_argument("-f", "--force", action="store_true", help="Skip prompt")
     p_delete.add_argument("--json", action="store_true", help="Output as JSON")
 
-    # 7. serve
+    # 7. bulk
+    p_bulk = subparsers.add_parser("bulk", help="Shorten multiple URLs from a file")
+    p_bulk.add_argument("file", type=str, help="Path to JSON or text file (one URL per line)")
+    p_bulk.add_argument("--base-url", type=str, default="http://localhost:8000", help="Base redirect URL")
+    p_bulk.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # 8. serve
     p_serve = subparsers.add_parser("serve", help="Launch redirect engine & REST API server")
     p_serve.add_argument("-p", "--port", type=int, default=8000, help="Server port (8000)")
     p_serve.add_argument("-H", "--host", type=str, default="127.0.0.1", help="Host interface")
@@ -309,6 +315,49 @@ def cmd_delete(args: argparse.Namespace, service: LinkService) -> int:
     return 0 if success else 1
 
 
+def cmd_bulk(args: argparse.Namespace, service: LinkService) -> int:
+    if not os.path.exists(args.file):
+        print(red(f"Error: File not found: '{args.file}'"), file=sys.stderr)
+        return 1
+
+    items = []
+    try:
+        with open(args.file, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if content.startswith("[") or content.startswith("{"):
+                parsed = json.loads(content)
+                items = parsed if isinstance(parsed, list) else parsed.get("items", [])
+            else:
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        items.append({"url": line})
+    except Exception as err:
+        print(red(f"Error parsing file: {err}"), file=sys.stderr)
+        return 1
+
+    results = service.bulk_shorten(items)
+    for r in results:
+        if r.get("success") and "code" in r:
+            r["short_url"] = f"{args.base_url.rstrip('/')}/{r['code']}"
+
+    if args.json:
+        print(json.dumps(results, indent=2))
+        return 0
+
+    print(bold(cyan(f"\n⚡ Bulk Shortened {len(results)} URLs:")))
+    print(f"{'STATUS':<8} {'CODE':<10} {'SHORT URL':<30} {'DESTINATION'}")
+    print("-" * 75)
+    for r in results:
+        if r.get("success"):
+            dest = r["target_url"] if len(r["target_url"]) <= 30 else r["target_url"][:27] + "..."
+            print(f"{green('OK'):<17} {bold(r['code']):<10} {r['short_url']:<30} {dest}")
+        else:
+            print(f"{red('FAIL'):<17} {'-':<10} {'-':<30} {r.get('url')} ({r.get('error')})")
+    print()
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entrypoint."""
     parser = build_parser()
@@ -329,6 +378,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_qr(args, service)
     elif args.command == "delete":
         return cmd_delete(args, service)
+    elif args.command == "bulk":
+        return cmd_bulk(args, service)
     elif args.command == "serve":
         from nanolink.server.handler import run_server
         return run_server(host=args.host, port=args.port, db=db)
