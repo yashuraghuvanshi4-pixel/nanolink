@@ -169,9 +169,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <!-- Active Links Table -->
     <section class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
         <h2>Existing Links</h2>
-        <button class="btn-secondary" onclick="loadLinks()" style="padding:0.4rem 0.8rem;font-size:0.85rem;">Refresh</button>
+        <div style="display:flex;gap:0.5rem;flex:1;max-width:400px;">
+          <input type="text" id="search-input" placeholder="🔍 Search code, URL, or tag..." style="padding:0.4rem 0.75rem;font-size:0.85rem;" oninput="onSearchInput()" />
+          <button class="btn-secondary" onclick="loadLinks()" style="padding:0.4rem 0.8rem;font-size:0.85rem;">Reset</button>
+        </div>
       </div>
       <div class="table-responsive">
         <table>
@@ -179,13 +182,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <tr>
               <th>Code</th>
               <th>Destination</th>
+              <th>Tags</th>
               <th>Clicks</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="links-tbody">
-            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Loading links...</td></tr>
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading links...</td></tr>
           </tbody>
         </table>
       </div>
@@ -264,29 +268,46 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       setTimeout(() => { copyBtn.textContent = "Copy Link"; }, 2000);
     });
 
-    async function loadLinks() {
+    let searchTimeout = null;
+    function onSearchInput() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const query = document.getElementById("search-input").value.trim();
+        loadLinks(query);
+      }, 250);
+    }
+
+    async function loadLinks(query = "") {
       const tbody = document.getElementById("links-tbody");
       try {
-        const res = await fetch("/api/links?limit=50");
+        const endpoint = query ? `/api/search?q=${encodeURIComponent(query)}` : "/api/links?limit=50";
+        const res = await fetch(endpoint);
         const data = await res.json();
-        if (!data.links || data.links.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No links created yet.</td></tr>';
+        const links = data.links || data.results || [];
+        if (links.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">${query ? 'No matching links found.' : 'No links created yet.'}</td></tr>`;
           return;
         }
-        tbody.innerHTML = data.links.map(l => `
-          <tr>
-            <td><a href="/${l.code}" target="_blank" class="link-code">${l.code}</a></td>
-            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.target_url}</td>
-            <td><strong>${l.click_count}</strong></td>
-            <td style="color:var(--text-muted);">${l.created_at.split('T')[0]}</td>
-            <td>
-              <button class="btn-secondary" onclick="viewStats('${l.code}')" style="padding:0.3rem 0.6rem;font-size:0.8rem;">Stats</button>
-              <a href="/api/qr/${l.code}" target="_blank" class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;text-decoration:none;display:inline-block;">QR</a>
-            </td>
-          </tr>
-        `).join("");
+        tbody.innerHTML = links.map(l => {
+          const tagsHtml = (l.tags && l.tags.length > 0)
+            ? l.tags.map(t => `<span class="badge" style="font-size:0.7rem;margin-right:0.25rem;">${t}</span>`).join("")
+            : '<span style="color:var(--text-muted);">-</span>';
+          return `
+            <tr>
+              <td><a href="/${l.code}" target="_blank" class="link-code">${l.code}</a></td>
+              <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.target_url}</td>
+              <td>${tagsHtml}</td>
+              <td><strong>${l.click_count}</strong></td>
+              <td style="color:var(--text-muted);">${l.created_at.split('T')[0]}</td>
+              <td>
+                <button class="btn-secondary" onclick="viewStats('${l.code}')" style="padding:0.3rem 0.6rem;font-size:0.8rem;">Stats</button>
+                <a href="/api/qr/${l.code}" target="_blank" class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;text-decoration:none;display:inline-block;">QR</a>
+              </td>
+            </tr>
+          `;
+        }).join("");
       } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--danger);">Error loading links.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);">Error loading links.</td></tr>';
       }
     }
 
