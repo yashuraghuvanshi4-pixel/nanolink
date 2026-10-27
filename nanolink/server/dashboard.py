@@ -201,7 +201,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="modal-content">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:0.75rem;">
         <h2 id="modal-title" style="margin:0;">Analytics</h2>
-        <button class="btn-secondary" onclick="closeModal()" style="padding:0.2rem 0.6rem;">&times;</button>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <a id="export-csv-link" class="btn-secondary" style="text-decoration:none;font-size:0.8rem;padding:0.3rem 0.6rem;" download>📥 Export CSV</a>
+          <button class="btn-secondary" onclick="closeModal()" style="padding:0.2rem 0.6rem;">&times;</button>
+        </div>
       </div>
 
       <div class="grid-metrics">
@@ -226,8 +229,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <h3 style="font-size:1rem;margin:1.2rem 0 0.5rem;">Daily Click History</h3>
       <div id="daily-chart" style="margin-bottom:1rem;"></div>
 
-      <h3 style="font-size:1rem;margin:1.2rem 0 0.5rem;">Top Referrers</h3>
-      <div id="referrers-list" style="font-size:0.9rem;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div>
+          <h3 style="font-size:1rem;margin:0.5rem 0;">Top Referrers</h3>
+          <div id="referrers-list" style="font-size:0.85rem;"></div>
+        </div>
+        <div>
+          <h3 style="font-size:1rem;margin:0.5rem 0;">Geographic Distribution</h3>
+          <div id="countries-list" style="font-size:0.85rem;"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -353,6 +364,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </div>
           `).join("");
         }
+
+        // Geographic distribution
+        const countryEl = document.getElementById("countries-list");
+        const countries = Object.entries(data.countries || {});
+        if (countries.length === 0) {
+          countryEl.innerHTML = '<div style="color:var(--text-muted);">No country data.</div>';
+        } else {
+          countryEl.innerHTML = countries.map(([geo, c]) => `
+            <div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+              <span>🌐 ${geo}</span><strong>${c} clicks</strong>
+            </div>
+          `).join("");
+        }
+
+        // Set export CSV link
+        document.getElementById("export-csv-link").href = `/api/stats/${code}/export?format=csv`;
 
         document.getElementById("stats-modal").style.display = "flex";
       } catch (err) {
