@@ -132,7 +132,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_bulk.add_argument("--base-url", type=str, default="http://localhost:8000", help="Base redirect URL")
     p_bulk.add_argument("--json", action="store_true", help="Output as JSON")
 
-    # 8. serve
+    # 8. export
+    p_export = subparsers.add_parser("export", help="Export click telemetry to CSV or JSON")
+    p_export.add_argument("code", type=str, help="Short link code")
+    p_export.add_argument("--format", choices=["csv", "json"], default="csv", help="Export format")
+    p_export.add_argument("-o", "--output", type=str, help="Save to output file path")
+
+    # 9. serve
     p_serve = subparsers.add_parser("serve", help="Launch redirect engine & REST API server")
     p_serve.add_argument("-p", "--port", type=int, default=8000, help="Server port (8000)")
     p_serve.add_argument("-H", "--host", type=str, default="127.0.0.1", help="Host interface")
@@ -358,6 +364,29 @@ def cmd_bulk(args: argparse.Namespace, service: LinkService) -> int:
     return 0
 
 
+def cmd_export(args: argparse.Namespace, db: Database) -> int:
+    clicks = db.get_clicks_for_link(args.code)
+    if args.format == "csv":
+        from nanolink.core.export import export_clicks_to_csv
+        result = export_clicks_to_csv(clicks)
+    else:
+        from nanolink.core.analytics import AnalyticsEngine
+        from nanolink.core.export import export_stats_to_json
+        stats = AnalyticsEngine(db).get_link_stats(args.code)
+        if stats is None:
+            print(red(f"Error: Link '{args.code}' not found."), file=sys.stderr)
+            return 1
+        result = export_stats_to_json(stats)
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(result)
+        print(green(f"✔ Exported {len(clicks)} records to {args.output}"))
+    else:
+        print(result)
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entrypoint."""
     parser = build_parser()
@@ -380,6 +409,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_delete(args, service)
     elif args.command == "bulk":
         return cmd_bulk(args, service)
+    elif args.command == "export":
+        return cmd_export(args, db)
     elif args.command == "serve":
         from nanolink.server.handler import run_server
         return run_server(host=args.host, port=args.port, db=db)

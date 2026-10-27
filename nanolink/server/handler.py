@@ -68,6 +68,22 @@ class NanolinkRequestHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, {"status": "ok", "version": __version__})
             return
 
+        # API: Export clicks
+        if path.startswith("/api/stats/") and path.endswith("/export"):
+            code = path.split("/api/stats/", 1)[1][:-7]  # strip /export
+            fmt = query.get("format", ["csv"])[0].lower()
+            clicks = self.db.get_clicks_for_link(code)
+            if fmt == "csv":
+                from nanolink.core.export import export_clicks_to_csv
+                csv_data = export_clicks_to_csv(clicks).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{code}_clicks.csv"')
+                self.send_header("Content-Length", str(len(csv_data)))
+                self.end_headers()
+                self.wfile.write(csv_data)
+                return
+
         # API: Get link stats
         if path.startswith("/api/stats/"):
             code = path.split("/api/stats/", 1)[1]
